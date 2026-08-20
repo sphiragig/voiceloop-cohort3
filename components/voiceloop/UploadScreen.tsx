@@ -1,26 +1,54 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { parseReviewCsv } from "@/lib/csv/parse-reviews";
+import { insertReviews } from "@/lib/supabase/reviews";
 import { Card } from "./AppShell";
 import { UploadIcon } from "./icons";
 
 type UploadStatus = "idle" | "loading" | "success" | "error";
 
-export function UploadScreen({ onComplete }: { onComplete: () => void }) {
+const sampleCsv = `review_text,rating,review_date,source,reviewer_name
+"The tomato toast was bright, fresh, and beautifully seasoned.",5,2026-08-19,Google,Maya R.
+"Our server was kind, but the drinks took nearly twenty minutes.",3,2026-08-18,Yelp,Jon P.
+"A cozy dining room and a thoughtful seasonal menu.",4,2026-08-17,OpenTable,Elena S.`;
+
+export function UploadScreen({ onComplete }: { onComplete: (count: number) => void }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [status, setStatus] = useState<UploadStatus>("idle");
+  const [message, setMessage] = useState("");
+  const [details, setDetails] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
 
-  const process = (file?: File) => {
-    if (file && !file.name.toLowerCase().endsWith(".csv")) {
+  const process = async (file?: File, sample?: string) => {
+    setDetails([]);
+    if (file && (!file.name.toLowerCase().endsWith(".csv") || file.size > 10 * 1024 * 1024)) {
       setStatus("error");
+      setMessage(file.size > 10 * 1024 * 1024 ? "The CSV must be 10 MB or smaller." : "Please choose a .csv file.");
       return;
     }
     setStatus("loading");
-    window.setTimeout(() => {
+    setMessage("Validating and uploading reviews…");
+
+    try {
+      const csv = sample ?? await file?.text() ?? "";
+      const parsed = parseReviewCsv(csv);
+      if (!parsed.ok) {
+        setStatus("error");
+        setMessage(parsed.error);
+        return;
+      }
+      const inserted = await insertReviews(parsed.rows);
       setStatus("success");
-      window.setTimeout(onComplete, 850);
-    }, 1000);
+      setMessage(`${inserted} ${inserted === 1 ? "review" : "reviews"} imported successfully.`);
+      setDetails(parsed.warnings);
+      window.setTimeout(() => onComplete(inserted), 850);
+    } catch (error) {
+      setStatus("error");
+      setMessage(error instanceof Error ? error.message : "The upload failed. Please try again.");
+    } finally {
+      if (inputRef.current) inputRef.current.value = "";
+    }
   };
 
   return (
@@ -38,17 +66,16 @@ export function UploadScreen({ onComplete }: { onComplete: () => void }) {
           <button onClick={() => inputRef.current?.click()} className="mt-6 rounded-lg bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">Choose CSV file</button>
           <input ref={inputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={(event) => process(event.target.files?.[0])} />
           <p className="mt-4 text-xs text-slate-500">CSV up to 10 MB · Required column: review_text</p>
-          {status !== "idle" && <StatusPanel status={status} />}
+          {status !== "idle" && <StatusPanel status={status} message={message} details={details} />}
         </div>
-        <div className="mt-7 flex flex-col items-center justify-between gap-3 border-t border-slate-200 pt-5 text-sm sm:flex-row"><span className="font-semibold text-slate-700">Expected CSV format</span><button onClick={() => process()} className="font-semibold text-blue-600 hover:text-blue-700">Try sample data →</button></div>
+        <div className="mt-7 flex flex-col items-center justify-between gap-3 border-t border-slate-200 pt-5 text-sm sm:flex-row"><span className="font-semibold text-slate-700">Expected CSV format</span><button disabled={status === "loading"} onClick={() => process(undefined, sampleCsv)} className="font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-50">Try sample data →</button></div>
       </Card>
       <div className="mx-auto mt-6 flex max-w-3xl items-center justify-center gap-5 text-xs text-slate-500"><span>✓ Secure upload</span><span>✓ No setup required</span><span className="hidden sm:inline">✓ Results in seconds</span></div>
     </section>
   );
 }
 
-function StatusPanel({ status }: { status: Exclude<UploadStatus, "idle"> }) {
+function StatusPanel({ status, message, details }: { status: Exclude<UploadStatus, "idle">; message: string; details: string[] }) {
   const styles = status === "loading" ? "bg-blue-50 text-blue-800" : status === "success" ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-800";
-  const text = status === "loading" ? "Analyzing reviews…" : status === "success" ? "✓ 248 reviews imported successfully." : "Please choose a valid CSV file and try again.";
-  return <div role="status" className={`mt-5 rounded-lg px-4 py-3 text-sm font-semibold ${styles}`}>{status === "loading" && <span className="mr-2 inline-block size-3 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />}{text}</div>;
+  return <div role="status" className={`mt-5 rounded-lg px-4 py-3 text-left text-sm font-semibold ${styles}`}><div>{status === "loading" && <span className="mr-2 inline-block size-3 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" />}{status === "success" && "✓ "}{message}</div>{details.length > 0 && <ul className="mt-2 list-disc space-y-1 pl-5 text-xs font-medium">{details.map((detail) => <li key={detail}>{detail}</li>)}</ul>}</div>;
 }

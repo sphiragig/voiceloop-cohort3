@@ -19,9 +19,9 @@ export function VoiceLoopApp() {
 
   return <>
     <AppShell screen={screen} mobileOpen={mobileOpen} onMobileOpenChange={setMobileOpen} onNavigate={setScreen}>
-      {screen === "upload" && <UploadScreen onComplete={() => { setScreen("dashboard"); notify("248 reviews imported successfully."); }} />}
+      {screen === "upload" && <UploadScreen onComplete={(count) => { setScreen("reviews"); notify(`${count} ${count === 1 ? "review" : "reviews"} imported successfully.`); }} />}
       {screen === "dashboard" && <DashboardScreen onNavigateDigest={() => setScreen("digest")} onEvidence={setEvidenceTheme} />}
-      {screen === "reviews" && <ReviewsScreen onEvidence={setEvidenceTheme} />}
+      {screen === "reviews" && <ReviewsScreen />}
       {screen === "digest" && <DigestScreen onEvidence={setEvidenceTheme} onRefreshed={() => notify("AI Digest refreshed.")} />}
     </AppShell>
     <EvidenceDrawer theme={evidenceTheme} onClose={closeEvidence} />
