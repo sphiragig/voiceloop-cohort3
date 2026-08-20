@@ -1,5 +1,6 @@
 import { supabase } from "./client";
 import type { ReviewInsert } from "@/lib/csv/parse-reviews";
+import type { ReviewAnalysis } from "@/lib/ai/review-analysis";
 
 export type StoredReview = {
   id: string;
@@ -28,14 +29,27 @@ export type ReviewQuery = {
 const reviewColumns = "id,review_text,rating,review_date,source,reviewer_name,sentiment,theme,created_at";
 
 export async function insertReviews(rows: ReviewInsert[]) {
-  let inserted = 0;
+  const inserted: StoredReview[] = [];
   for (let index = 0; index < rows.length; index += 250) {
     const batch = rows.slice(index, index + 250);
-    const { error } = await supabase.from("reviews").insert(batch);
+    const { data, error } = await supabase.from("reviews").insert(batch).select(reviewColumns);
     if (error) throw new Error(error.message);
-    inserted += batch.length;
+    inserted.push(...((data ?? []) as StoredReview[]));
   }
   return inserted;
+}
+
+export async function updateReviewAnalysis(result: ReviewAnalysis) {
+  const { data, error } = await supabase
+    .from("reviews")
+    .update({ theme: result.theme, sentiment: result.sentiment })
+    .eq("id", result.id)
+    .is("theme", null)
+    .is("sentiment", null)
+    .select("id")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error(`Review ${result.id} was not updated.`);
 }
 
 export async function fetchReviews(filters: ReviewQuery) {

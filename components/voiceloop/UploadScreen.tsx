@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { parseReviewCsv } from "@/lib/csv/parse-reviews";
 import { insertReviews } from "@/lib/supabase/reviews";
+import { analyzeReviews } from "@/lib/ai/analyze-reviews";
 import { Card } from "./AppShell";
 import { UploadIcon } from "./icons";
 
@@ -39,10 +40,17 @@ export function UploadScreen({ onComplete }: { onComplete: (count: number) => vo
         return;
       }
       const inserted = await insertReviews(parsed.rows);
+      setMessage("Analyzing customer feedback…");
+      const analysis = await analyzeReviews(inserted);
+      if (analysis.failed > 0) {
+        setStatus("error");
+        setMessage(`${inserted.length} reviews were uploaded safely, but ${analysis.failed} could not be analyzed. ${analysis.errors[0] ?? "Try again later."}`);
+        return;
+      }
       setStatus("success");
-      setMessage(`${inserted} ${inserted === 1 ? "review" : "reviews"} imported successfully.`);
+      setMessage(`${inserted.length} ${inserted.length === 1 ? "review" : "reviews"} imported and analyzed successfully.`);
       setDetails(parsed.warnings);
-      window.setTimeout(() => onComplete(inserted), 850);
+      window.setTimeout(() => onComplete(inserted.length), 850);
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "The upload failed. Please try again.");
