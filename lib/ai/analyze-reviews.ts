@@ -1,5 +1,6 @@
 import { updateReviewAnalysis, type StoredReview } from "@/lib/supabase/reviews";
 import { isReviewAnalysis, type ReviewAnalysis } from "./review-analysis";
+import { ensureDemoSession } from "./demo-session";
 
 const batchSize = 10;
 
@@ -16,8 +17,10 @@ export async function analyzeReviews(reviews: StoredReview[]): Promise<AnalysisS
   for (let index = 0; index < pending.length; index += batchSize) {
     const batch = pending.slice(index, index + batchSize);
     try {
+      await ensureDemoSession();
       const response = await fetch("/api/reviews/analyze", {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           reviews: batch.map(({ id, review_text }) => ({ id, review_text })),

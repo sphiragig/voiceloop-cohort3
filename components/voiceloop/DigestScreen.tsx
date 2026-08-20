@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { AIDigest, DigestInsight, DigestProblem } from "@/lib/ai/digest";
+import { ensureDemoSession } from "@/lib/ai/demo-session";
 import { Card, OutlineButton, SectionHeading } from "./AppShell";
 import { RefreshIcon, SparklesIcon } from "./icons";
 
@@ -14,7 +15,8 @@ export function DigestScreen({ onEvidence, onRefreshed }: { onEvidence: (theme: 
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/digest", { method: "POST" });
+      await ensureDemoSession();
+      const response = await fetch("/api/digest", { method: "POST", credentials: "same-origin" });
       const payload = await response.json() as { digest?: AIDigest; error?: string };
       if (!response.ok || !payload.digest) throw new Error(payload.error ?? "AI Digest could not be generated.");
       setDigest(payload.digest);

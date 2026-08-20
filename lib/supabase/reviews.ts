@@ -15,10 +15,13 @@ export type StoredReview = {
 };
 
 export type ReviewSort = "new" | "old";
+export type ReviewSentiment = Exclude<StoredReview["sentiment"], null>;
 
 export type ReviewQuery = {
   search: string;
   source: string;
+  theme: string;
+  sentiment: string;
   dateFrom: string;
   dateTo: string;
   sort: ReviewSort;
@@ -65,6 +68,8 @@ export async function fetchReviews(filters: ReviewQuery) {
     query = query.ilike("review_text", `%${safeSearch}%`);
   }
   if (filters.source) query = query.eq("source", filters.source);
+  if (filters.theme) query = query.eq("theme", filters.theme);
+  if (filters.sentiment) query = query.eq("sentiment", filters.sentiment);
   if (filters.dateFrom) query = query.gte("review_date", filters.dateFrom);
   if (filters.dateTo) query = query.lte("review_date", filters.dateTo);
 
@@ -85,6 +90,16 @@ export async function fetchReviewSources() {
     .limit(1000);
   if (error) throw new Error(error.message);
   return [...new Set((data ?? []).map((row) => row.source).filter(Boolean) as string[])].sort();
+}
+
+export async function fetchReviewThemes() {
+  const { data, error } = await supabase
+    .from("reviews")
+    .select("theme")
+    .not("theme", "is", null)
+    .limit(1000);
+  if (error) throw new Error(error.message);
+  return [...new Set((data ?? []).map((row) => row.theme).filter(Boolean) as string[])].sort();
 }
 
 export async function fetchReviewsByTheme(theme: string) {

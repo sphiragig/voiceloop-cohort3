@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { digestJsonSchema, validateDigest } from "@/lib/ai/digest";
+import { protectDemoRoute } from "@/lib/server/demo-protection";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,10 @@ type DigestReview = {
   sentiment: "Positive" | "Neutral" | "Negative";
 };
 
-export async function POST() {
+export async function POST(request: Request) {
+  const blocked = protectDemoRoute(request, "digest", 4, 5 * 60_000);
+  if (blocked) return blocked;
+
   const apiKey = process.env.OPENAI_API_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

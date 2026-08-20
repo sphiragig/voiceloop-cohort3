@@ -6,12 +6,16 @@ import {
   sentiments,
   type ReviewForAnalysis,
 } from "@/lib/ai/review-analysis";
+import { protectDemoRoute } from "@/lib/server/demo-protection";
 
 export const runtime = "nodejs";
 
 const batchSize = 10;
 
 export async function POST(request: Request) {
+  const blocked = protectDemoRoute(request, "review-analysis", 12);
+  if (blocked) return blocked;
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(

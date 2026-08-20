@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { fetchReviews, fetchReviewSources, type ReviewSort, type StoredReview } from "@/lib/supabase/reviews";
+import { fetchReviews, fetchReviewSources, fetchReviewThemes, type ReviewSentiment, type ReviewSort, type StoredReview } from "@/lib/supabase/reviews";
 import { Card, OutlineButton, SectionHeading } from "./AppShell";
 import { SearchIcon } from "./icons";
 
@@ -10,12 +10,15 @@ const pageSize = 6;
 export function ReviewsScreen({ onThemeSelect }: { onThemeSelect: (theme: string) => void }) {
   const [search, setSearch] = useState("");
   const [source, setSource] = useState("");
+  const [theme, setTheme] = useState("");
+  const [sentiment, setSentiment] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [sort, setSort] = useState<ReviewSort>("new");
   const [page, setPage] = useState(1);
   const [reviews, setReviews] = useState<StoredReview[]>([]);
   const [sources, setSources] = useState<string[]>([]);
+  const [themes, setThemes] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -23,7 +26,14 @@ export function ReviewsScreen({ onThemeSelect }: { onThemeSelect: (theme: string
 
   useEffect(() => {
     let cancelled = false;
-    fetchReviewSources().then((items) => { if (!cancelled) setSources(items); }).catch(() => undefined);
+    Promise.all([fetchReviewSources(), fetchReviewThemes()])
+      .then(([sourceItems, themeItems]) => {
+        if (!cancelled) {
+          setSources(sourceItems);
+          setThemes(themeItems);
+        }
+      })
+      .catch(() => undefined);
     return () => { cancelled = true; };
   }, [reloadKey]);
 
@@ -33,7 +43,7 @@ export function ReviewsScreen({ onThemeSelect }: { onThemeSelect: (theme: string
       setLoading(true);
       setError("");
       try {
-        const result = await fetchReviews({ search, source, dateFrom, dateTo, sort, page, pageSize });
+        const result = await fetchReviews({ search, source, theme, sentiment, dateFrom, dateTo, sort, page, pageSize });
         if (!cancelled) {
           setReviews(result.reviews);
           setTotal(result.count);
@@ -45,18 +55,20 @@ export function ReviewsScreen({ onThemeSelect }: { onThemeSelect: (theme: string
       }
     }, search ? 250 : 0);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [search, source, dateFrom, dateTo, sort, page, reloadKey]);
+  }, [search, source, theme, sentiment, dateFrom, dateTo, sort, page, reloadKey]);
 
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const updateFilter = (change: () => void) => { change(); setPage(1); };
-  const clear = () => { setSearch(""); setSource(""); setDateFrom(""); setDateTo(""); setSort("new"); setPage(1); };
+  const clear = () => { setSearch(""); setSource(""); setTheme(""); setSentiment(""); setDateFrom(""); setDateTo(""); setSort("new"); setPage(1); };
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
       <SectionHeading eyebrow="REVIEW EXPLORER" title="All customer reviews" description={`${total} reviews match your filters.`} action={<OutlineButton onClick={clear}>Clear filters</OutlineButton>} />
-      <Card className="mb-5 grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-[1.6fr_1fr_1fr_1fr_1fr]">
-        <label className="relative"><span className="sr-only">Search reviews</span><SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"/><input value={search} onChange={(event) => updateFilter(() => setSearch(event.target.value))} type="search" placeholder="Search review text…" className="h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+      <Card className="mb-5 grid gap-3 p-3 md:grid-cols-2 xl:grid-cols-4">
+        <label className="relative xl:col-span-2"><span className="sr-only">Search reviews</span><SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"/><input value={search} onChange={(event) => updateFilter(() => setSearch(event.target.value))} type="search" placeholder="Search review text…" className="h-11 w-full rounded-lg border border-slate-300 bg-white pl-10 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
         <label><span className="sr-only">Source</span><select value={source} onChange={(event) => updateFilter(() => setSource(event.target.value))} className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option value="">All sources</option>{sources.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label><span className="sr-only">Theme</span><select aria-label="Theme" value={theme} onChange={(event) => updateFilter(() => setTheme(event.target.value))} className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option value="">All themes</option>{themes.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label><span className="sr-only">Sentiment</span><select aria-label="Sentiment" value={sentiment} onChange={(event) => updateFilter(() => setSentiment(event.target.value))} className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option value="">All sentiments</option>{(["Positive", "Neutral", "Negative"] satisfies ReviewSentiment[]).map((item) => <option key={item}>{item}</option>)}</select></label>
         <label><span className="sr-only">From date</span><input aria-label="From date" value={dateFrom} max={dateTo || undefined} onChange={(event) => updateFilter(() => setDateFrom(event.target.value))} type="date" className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-600 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
         <label><span className="sr-only">To date</span><input aria-label="To date" value={dateTo} min={dateFrom || undefined} onChange={(event) => updateFilter(() => setDateTo(event.target.value))} type="date" className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-600 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
         <label><span className="sr-only">Sort</span><select aria-label="Sort" value={sort} onChange={(event) => updateFilter(() => setSort(event.target.value as ReviewSort))} className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"><option value="new">Newest first</option><option value="old">Oldest first</option></select></label>
