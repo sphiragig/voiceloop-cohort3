@@ -86,3 +86,15 @@ export async function fetchReviewSources() {
   if (error) throw new Error(error.message);
   return [...new Set((data ?? []).map((row) => row.source).filter(Boolean) as string[])].sort();
 }
+
+export async function fetchReviewsByTheme(theme: string) {
+  const { data, error } = await supabase
+    .from("reviews")
+    .select(reviewColumns)
+    .eq("theme", theme)
+    .order("review_date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as StoredReview[];
+}
