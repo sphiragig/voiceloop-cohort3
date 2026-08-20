@@ -20,7 +20,7 @@ export function VoiceLoopApp() {
   return <>
     <AppShell screen={screen} mobileOpen={mobileOpen} onMobileOpenChange={setMobileOpen} onNavigate={setScreen}>
       {screen === "upload" && <UploadScreen onComplete={(count) => { setScreen("reviews"); notify(`${count} ${count === 1 ? "review" : "reviews"} imported successfully.`); }} />}
-      {screen === "dashboard" && <DashboardScreen onNavigateDigest={() => setScreen("digest")} onEvidence={setEvidenceTheme} />}
+      {screen === "dashboard" && <DashboardScreen onNavigateDigest={() => setScreen("digest")} />}
       {screen === "reviews" && <ReviewsScreen />}
       {screen === "digest" && <DigestScreen onEvidence={setEvidenceTheme} onRefreshed={() => notify("AI Digest refreshed.")} />}
     </AppShell>
